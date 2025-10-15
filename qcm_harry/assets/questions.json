@@ -1,0 +1,226 @@
+{
+  "version": 1,
+  "houses": ["gryffindor","slytherin","ravenclaw","hufflepuff"],
+  "questions": [
+    {
+      "id": 1,
+      "text": "Quel parchemin choisirais-tu pour apprendre un nouveau sort ?",
+      "icon": "menu_book",
+      "answers": [
+        { "key": "A", "label": "Un parchemin courageux avec runes flamboyantes", "house": "gryffindor" },
+        { "key": "B", "label": "Un manuscrit rare écrit en argot ancien", "house": "slytherin" },
+        { "key": "C", "label": "Une codex logique plein de diagrammes", "house": "ravenclaw" },
+        { "key": "D", "label": "Un guide pratique, simple et utile", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "Tu découvres une potion incomplète : que fais-tu ?",
+      "icon": "science",
+      "answers": [
+        { "key": "A", "label": "Lancer et apprendre du résultat", "house": "gryffindor" },
+        { "key": "B", "label": "L'optimiser pour un usage secret", "house": "slytherin" },
+        { "key": "C", "label": "Analyser chaque ingrédient", "house": "ravenclaw" },
+        { "key": "D", "label": "La finir pour la partager avec les autres", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 3,
+      "text": "La nuit, quelle activité magique préfères-tu ?",
+      "icon": "dark_mode",
+      "answers": [
+        { "key": "A", "label": "Patrouiller pour protéger les faibles", "house": "gryffindor" },
+        { "key": "B", "label": "Tramer un plan malin", "house": "slytherin" },
+        { "key": "C", "label": "Étudier les étoiles et leurs secrets", "house": "ravenclaw" },
+        { "key": "D", "label": "Veiller auprès d'un ami qui a peur", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 4,
+      "text": "Ton cri de victoire après un duel réussi ?",
+      "icon": "emoji_events",
+      "answers": [
+        { "key": "A", "label": "Un rugissement franc", "house": "gryffindor" },
+        { "key": "B", "label": "Un sourire satisfait et discret", "house": "slytherin" },
+        { "key": "C", "label": "Un haussement de sourcil analytique", "house": "ravenclaw" },
+        { "key": "D", "label": "Un rire partagé avec l'adversaire", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 5,
+      "text": "Tu trouves une énigme qui verrouille un coffre — approche ?",
+      "icon": "help",
+      "answers": [
+        { "key": "A", "label": "Essayer une solution impulsive", "house": "gryffindor" },
+        { "key": "B", "label": "Chercher un moyen détourné d'ouvrir", "house": "slytherin" },
+        { "key": "C", "label": "Résoudre logiquement l'énigme", "house": "ravenclaw" },
+        { "key": "D", "label": "Demander de l'aide et collaborer", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 6,
+      "text": "Quel animal magique te représente le mieux ?",
+      "icon": "pets",
+      "answers": [
+        { "key": "A", "label": "Un lion audacieux", "house": "gryffindor" },
+        { "key": "B", "label": "Un serpent furtif", "house": "slytherin" },
+        { "key": "C", "label": "Un corbeau curieux", "house": "ravenclaw" },
+        { "key": "D", "label": "Un blaireau patient", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 7,
+      "text": "Quand un camarade est accusé injustement, tu :",
+      "icon": "gavel",
+      "answers": [
+        { "key": "A", "label": "Défends sans hésiter", "house": "gryffindor" },
+        { "key": "B", "label": "Trouves la faille dans l'accusation", "house": "slytherin" },
+        { "key": "C", "label": "Collectes les preuves méthodiquement", "house": "ravenclaw" },
+        { "key": "D", "label": "Soutiens et consoles la personne", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 8,
+      "text": "Préfères-tu un artefact : puissant mais dangereux ou modeste mais sûr ?",
+      "icon": "bolt",
+      "answers": [
+        { "key": "A", "label": "Le puissant — le risque vaut la récompense", "house": "gryffindor" },
+        { "key": "B", "label": "Le puissant, manipulable à distance", "house": "slytherin" },
+        { "key": "C", "label": "L'artefact avec logique et raison", "house": "ravenclaw" },
+        { "key": "D", "label": "Le modeste et utile pour tous", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 9,
+      "text": "Quelle qualité apprécies-tu le plus chez un mentor ?",
+      "icon": "support_agent",
+      "answers": [
+        { "key": "A", "label": "Courage et exemple", "house": "gryffindor" },
+        { "key": "B", "label": "Ambition et pragmatisme", "house": "slytherin" },
+        { "key": "C", "label": "Sagesse et curiosité", "house": "ravenclaw" },
+        { "key": "D", "label": "Bienveillance et patience", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 10,
+      "text": "Ton sort favori devrait être :",
+      "icon": "auto_fix_high",
+      "answers": [
+        { "key": "A", "label": "Audacieux et spectaculaire", "house": "gryffindor" },
+        { "key": "B", "label": "Subtil et efficace", "house": "slytherin" },
+        { "key": "C", "label": "Intelligent et adaptable", "house": "ravenclaw" },
+        { "key": "D", "label": "Pratique et utile", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 11,
+      "text": "Un ancien portail s'ouvre — ta réaction ?",
+      "icon": "all_inclusive",
+      "answers": [
+        { "key": "A", "label": "Entrer et affronter l'inconnu", "house": "gryffindor" },
+        { "key": "B", "label": "Étudier et utiliser le portail à ton avantage", "house": "slytherin" },
+        { "key": "C", "label": "Comprendre sa mécanique", "house": "ravenclaw" },
+        { "key": "D", "label": "Aider ceux qui hésitent", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 12,
+      "text": "Quel objet apporterais-tu en expédition ?",
+      "icon": "backpack",
+      "answers": [
+        { "key": "A", "label": "Une épée enchantée", "house": "gryffindor" },
+        { "key": "B", "label": "Une bourse avec réseaux utiles", "house": "slytherin" },
+        { "key": "C", "label": "Un grimoire de notes", "house": "ravenclaw" },
+        { "key": "D", "label": "Une trousse de soins", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 13,
+      "text": "Ta stratégie en équipe ?",
+      "icon": "groups",
+      "answers": [
+        { "key": "A", "label": "Prendre l'initiative", "house": "gryffindor" },
+        { "key": "B", "label": "Coordonner discrètement", "house": "slytherin" },
+        { "key": "C", "label": "Trouver la meilleure solution", "house": "ravenclaw" },
+        { "key": "D", "label": "Soutenir pour que chacun brille", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 14,
+      "text": "Un sort échoue : tu blâmes ?",
+      "icon": "report_problem",
+      "answers": [
+        { "key": "A", "label": "Tu assumes et réessayes", "house": "gryffindor" },
+        { "key": "B", "label": "Tu identifies qui a mal agi", "house": "slytherin" },
+        { "key": "C", "label": "Tu analyses l'erreur tranquillement", "house": "ravenclaw" },
+        { "key": "D", "label": "Tu consoles et aides à s'améliorer", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 15,
+      "text": "Quelle est ta revanche idéale après une injustice ?",
+      "icon": "thumb_down",
+      "answers": [
+        { "key": "A", "label": "Un acte de bravoure public", "house": "gryffindor" },
+        { "key": "B", "label": "Un plan longuement mûri", "house": "slytherin" },
+        { "key": "C", "label": "Révéler la vérité par les faits", "house": "ravenclaw" },
+        { "key": "D", "label": "Prouver sa valeur par l'exemple", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 16,
+      "text": "Ton style de formation magique ?",
+      "icon": "school",
+      "answers": [
+        { "key": "A", "label": "Épreuves pratiques intenses", "house": "gryffindor" },
+        { "key": "B", "label": "Mentorat stratégique", "house": "slytherin" },
+        { "key": "C", "label": "Cours théoriques approfondis", "house": "ravenclaw" },
+        { "key": "D", "label": "Ateliers collectifs", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 17,
+      "text": "Quand tu gagnes, tu partages ?",
+      "icon": "share",
+      "answers": [
+        { "key": "A", "label": "Si cela inspire d'autres", "house": "gryffindor" },
+        { "key": "B", "label": "Seulement si utile à tes plans", "house": "slytherin" },
+        { "key": "C", "label": "Avec ceux qui cherchent à apprendre", "house": "ravenclaw" },
+        { "key": "D", "label": "Toujours volontiers", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 18,
+      "text": "Ton lieu favori dans un château magique ?",
+      "icon": "castle",
+      "answers": [
+        { "key": "A", "label": "La tour de garde", "house": "gryffindor" },
+        { "key": "B", "label": "Les couloirs secrets", "house": "slytherin" },
+        { "key": "C", "label": "La bibliothèque ancienne", "house": "ravenclaw" },
+        { "key": "D", "label": "La serre communautaire", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 19,
+      "text": "Ton proverbe préféré ?",
+      "icon": "menu_book",
+      "answers": [
+        { "key": "A", "label": "La bravoure forge le destin", "house": "gryffindor" },
+        { "key": "B", "label": "La ruse ouvre les portes", "house": "slytherin" },
+        { "key": "C", "label": "La connaissance éclaire", "house": "ravenclaw" },
+        { "key": "D", "label": "La loyauté unit", "house": "hufflepuff" }
+      ]
+    },
+    {
+      "id": 20,
+      "text": "Quelle est ta plus grande force ?",
+      "icon": "self_improvement",
+      "answers": [
+        { "key": "A", "label": "Le courage", "house": "gryffindor" },
+        { "key": "B", "label": "L'ambition", "house": "slytherin" },
+        { "key": "C", "label": "La raison", "house": "ravenclaw" },
+        { "key": "D", "label": "La constance", "house": "hufflepuff" }
+      ]
+    }
+  ]
+}
