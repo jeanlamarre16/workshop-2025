@@ -1,0 +1,308 @@
+version: "3.9"
+
+# Deploy with:
+# docker stack deploy -c stack.prod.yml bigdata
+
+services:
+
+  traefik:
+    image: traefik:2.10.4
+    configs:
+      - source: traefik_conf
+        target: /etc/traefik/traefik.yml
+    ports:
+      - target: 80     published: 80  mode: host
+      - target: 443    published: 443 mode: host
+      - target: 8080   published: 8080 mode: host  # restrict via firewall
+    networks:
+      - front
+    volumes:
+      - traefik_acme:/acme
+    deploy:
+      mode: replicated
+      replicas: 3
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1G
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+    configs:
+      - source: traefik_dynamic
+        target: /dynamic/dynamic.yml
+
+  crowdsec:
+    image: crowdsec/crowdsec:1.6.4
+    networks:
+      - front
+    volumes:
+      - crowdsec_data:/var/lib/crowdsec/data
+      - /var/log:/var/log:ro
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == manager
+      update_config:
+        parallelism: 1
+        delay: 10s
+
+  traefik-bouncer:
+    image: crowdsec/traefik-bouncer:2.1.0
+    environment:
+      - CROWDSEC_API_URL=http://crowdsec:8080
+    networks:
+      - front
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == manager
+
+  mariadb:
+    image: mariadb:10.11.3
+    env_file: .env
+    secrets:
+      - mariadb_root_password
+      - glpi_db_password
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - back
+      - data
+    deploy:
+      mode: replicated
+      replicas: 2
+      placement:
+        constraints:
+          - node.labels.storage == true
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+
+  glpi:
+    image: glpi/glpi:10.0.9
+    env_file: .env
+    secrets:
+      - glpi_db_password
+    volumes:
+      - glpi_data:/var/www/html:rw
+    networks:
+      - front
+      - back
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.glpi.rule=Host(`glpi.${DOMAIN}`)"
+      - "traefik.http.routers.glpi.entrypoints=websecure"
+      - "traefik.http.routers.glpi.tls.certresolver=le"
+      - "traefik.http.routers.glpi.middlewares=securityHeaders@file,ratelimit"
+    deploy:
+      replicas: 3
+      placement:
+        constraints:
+          - node.labels.app==true
+        preferences:
+          - spread: node.hostname
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+
+  opensearch:
+    image: opensearchproject/opensearch:2.15.0
+    environment:
+      - cluster.name=opensearch-cluster
+      - discovery.type=zen
+      - network.host=0.0.0.0
+      - discovery.seed_hosts=opensearch1,opensearch2,opensearch3
+      - cluster.initial_master_nodes=opensearch1,opensearch2,opensearch3
+      - bootstrap.memory_lock=true
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    networks:
+      - data
+    deploy:
+      mode: replicated
+      replicas: 3
+      placement:
+        constraints:
+          - node.labels.data==true
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.15.0
+    networks:
+      - front
+      - data
+    deploy:
+      replicas: 2
+
+  cassandra:
+    image: cassandra:4.1.9
+    env_file: .env
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    networks:
+      - data
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.labels.db==true
+      restart_policy:
+        condition: on-failure
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - back
+      - data
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == manager
+
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - back
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == manager
+
+  grafana:
+    image: grafana/grafana:9.5.2
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - front
+      - back
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == manager
+
+  loki:
+    image: grafana/loki:2.8.1
+    volumes:
+      - loki_data:/loki
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+    networks:
+      - back
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.role == manager
+
+  promtail:
+    image: grafana/promtail:2.8.1
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    networks:
+      - back
+      - data
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == worker
+
+  minio:
+    image: minio/minio:RELEASE.2025-02-17T00-01-16Z
+    command: server /data --compat
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD_FILE=/run/secrets/minio_root_password
+    volumes:
+      - minio_data:/data
+    networks:
+      - data
+    secrets:
+      - minio_root_password
+    deploy:
+      replicas: 2
+      placement:
+        constraints:
+          - node.labels.storage == true
+
+secrets:
+  mariadb_root_password:
+    external: true
+  glpi_db_password:
+    external: true
+  grafana_admin_password:
+    external: true
+  minio_root_password:
+    external: true
+  restic_password:
+    external: true
+
+configs:
+  traefik_conf:
+    file: ./traefik/traefik.yml
+  traefik_dynamic:
+    file: ./traefik/dynamic/middlewares.yml
+
+networks:
+  front:
+    driver: overlay
+    attachable: true
+  back:
+    driver: overlay
+    attachable: true
+  data:
+    driver: overlay
+    attachable: true
+
+volumes:
+  traefik_acme:
+  db_data:
+    driver: local
+  opensearch_data:
+  cassandra_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  minio_data:
+  glpi_data:
+  crowdsec_data:

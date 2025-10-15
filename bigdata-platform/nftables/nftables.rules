@@ -1,0 +1,43 @@
+#!/usr/sbin/nft -f
+
+table inet filter {
+  # default drop for forward/input except allowed
+  chain input {
+    type filter hook input priority 0; policy drop;
+    # allow lo
+    iif lo accept
+    ct state established,related accept
+    # allow SSH (change port if needed)
+    tcp dport 22 ct state new accept
+    # allow HTTP/HTTPS for Traefik
+    tcp dport 80 accept
+    tcp dport 443 accept
+    # allow Traefik dashboard (restrict by source IP list)
+    tcp dport 8080 ip saddr 10.0.0.0/8 accept
+    # allow Prometheus/Alertmanager/Grafana from internal network
+    tcp dport 9090 ip saddr 10.0.0.0/8 accept
+    tcp dport 9093 ip saddr 10.0.0.0/8 accept
+    tcp dport 3000 ip saddr 10.0.0.0/8 accept
+    # allow Docker Swarm control plane (manager ports)
+    tcp dport 2377 accept
+    udp dport 4789 accept
+    tcp dport 7946 accept
+    udp dport 7946 accept
+    # allow MinIO
+    tcp dport 9000 ip saddr 10.0.0.0/8 accept
+    # healthchecks / other services base
+    # ICMP for ping / diagnostics
+    ip protocol icmp accept
+    # log & drop rest
+    counter log prefix "nft-drop: " drop
+  }
+
+  chain forward {
+    type filter hook forward priority 0; policy drop;
+    ct state established,related accept
+  }
+
+  chain output {
+    type filter hook output priority 0; policy accept;
+  }
+}

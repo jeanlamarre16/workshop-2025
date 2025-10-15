@@ -1,0 +1,37 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "iteration": 162343,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Services up",
+      "targets": [
+        {
+          "expr": "sum(up == 1)",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU usage",
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total[5m])) by (instance)",
+          "refId": "B"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }
+    }
+  ],
+  "schemaVersion": 27,
+  "tags": ["infra"],
+  "title": "Infra Overview",
+  "uid": "infra-overview"
+}

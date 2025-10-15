@@ -1,0 +1,14 @@
+cluster_name: 'bigdata_cassandra'
+num_tokens: 256
+seed_provider:
+  - class_name: org.apache.cassandra.locator.SimpleSeedProvider
+    parameters:
+      - seeds: "cassandra1,cassandra2,cassandra3"
+
+listen_address: 0.0.0.0
+rpc_address: 0.0.0.0
+
+endpoint_snitch: GossipingPropertyFileSnitch
+
+# reduce gossip/timeout for containerized env
+phi_convict_threshold: 12

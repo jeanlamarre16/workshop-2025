@@ -1,0 +1,422 @@
+services:
+
+  traefik:
+    image: traefik:2.10.4
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--api=true"
+      - "--metrics.prometheus=true"
+      - "--certificatesresolvers.le.acme.email=${TRAEFIK_ACME_EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/acme/acme.json"
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+      - "--log.level=INFO"
+      - "--serversTransport.insecureSkipVerify=true" # dev only
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # traefik dashboard dev
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/acme:/acme"
+      - "./traefik/dynamic:/dynamic"
+    environment:
+      - "TZ=Europe/Paris"
+    deploy: # ignored by compose, present for parity
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+
+  crowdsec:
+    # fixed image name: use the official crowdsecurity namespace on Docker Hub
+    # use :latest as a fallback if a specific tag is not available locally/remote
+    image: crowdsecurity/crowdsec:latest
+    volumes:
+      - ./crowdsec/data:/var/lib/crowdsec/data
+      - ./crowdsec/config:/etc/crowdsec
+      - /var/log:/var/log:ro
+    cap_drop:
+      - ALL
+    cap_add: []
+    restart: unless-stopped
+    networks:
+      - front
+
+  traefik-bouncer:
+    image: fbonalair/traefik-crowdsec-bouncer:0.4.0
+    environment:
+      - CROWDSEC_BOUNCER_API_KEY=${CROWDSEC_BOUNCER_API_KEY}
+      - CROWDSEC_AGENT_HOST=crowdsec:8080
+    depends_on:
+      - crowdsec
+    networks:
+      - front
+
+  mariadb:
+    image: mariadb:10.11.3
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mariadb_root_password
+      - MYSQL_DATABASE=${GLPI_DB_NAME}
+      - MYSQL_USER=${GLPI_DB_USER}
+      - MYSQL_PASSWORD_FILE=/run/secrets/glpi_db_password
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      # use CMD-SHELL so the $(cat ...) substitution is expanded by a shell
+      test: ["CMD-SHELL", "mysqladmin ping -u root --password=$(cat /run/secrets/mariadb_root_password) || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    secrets:
+      - mariadb_root_password
+      - glpi_db_password
+    networks:
+      - back
+      - data
+
+  glpi:
+    image: glpi/glpi:11.0.1
+    environment:
+      - GLPI_DB_HOST=mariadb
+      - GLPI_DB_USER=${GLPI_DB_USER}
+      - GLPI_DB_PASSWORD_FILE=/run/secrets/glpi_db_password
+      - GLPI_DB_NAME=${GLPI_DB_NAME}
+    depends_on:
+      - mariadb
+    volumes:
+      - glpi_data:/var/www/html
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.glpi.rule=Host(`glpi.${DOMAIN}`)"
+      - "traefik.http.routers.glpi.entrypoints=websecure"
+      - "traefik.http.routers.glpi.tls.certresolver=le"
+      - "traefik.http.middlewares.crowdsec-forwardauth.forwardauth.address=http://traefik-bouncer:8080/api/v1/forwardAuth"
+      - "traefik.http.middlewares.crowdsec-forwardauth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.routers.glpi.middlewares=securityHeaders@file,ratelimit,crowdsec-forwardauth@docker"
+      - "traefik.http.services.glpi.loadbalancer.server.port=80"
+
+    secrets:
+      - glpi_db_password
+    healthcheck:
+      test: ["CMD-SHELL","curl -f http://localhost || exit 1"]
+    networks:
+      - front
+      - back
+      - data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1G
+
+  opensearch1:
+    image: opensearchproject/opensearch:2.15.0
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch1
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=S3cureP@ssw0rd!"
+      - discovery.seed_hosts=opensearch2,opensearch3
+      - cluster.initial_master_nodes=opensearch1,opensearch2,opensearch3
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch1_data:/usr/share/opensearch/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL","curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+
+  opensearch2:
+    image: opensearchproject/opensearch:2.15.0
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch2
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=S3cureP@ssw0rd!"
+      - discovery.seed_hosts=opensearch1,opensearch3
+      - cluster.initial_master_nodes=opensearch1,opensearch2,opensearch3
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch2_data:/usr/share/opensearch/data
+    networks:
+      - data
+
+  opensearch3:
+    image: opensearchproject/opensearch:2.15.0
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch3
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=S3cureP@ssw0rd!"
+      - discovery.seed_hosts=opensearch1,opensearch2
+      - cluster.initial_master_nodes=opensearch1,opensearch2,opensearch3
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch3_data:/usr/share/opensearch/data
+    networks:
+      - data
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.15.0
+    environment:
+      - OPENSEARCH_HOSTS=https://opensearch2:9200
+    ports:
+      - "5601:5601"
+    networks:
+      - front
+      - data
+    depends_on:
+      - opensearch1
+      - opensearch2
+
+  cassandra1:
+    image: cassandra:4.1.9
+    environment:
+      - CASSANDRA_CLUSTER_NAME=${CASSANDRA_CLUSTER_NAME}
+      - CASSANDRA_DC=${CASSANDRA_DC}
+      - CASSANDRA_RACK=${CASSANDRA_RACK}
+      - CASSANDRA_SEEDS=cassandra1,cassandra2,cassandra3
+    volumes:
+      - cassandra1_data:/var/lib/cassandra
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL","nodetool status || exit 1"]
+
+  cassandra2:
+    image: cassandra:4.1.9
+    environment:
+      - CASSANDRA_CLUSTER_NAME=${CASSANDRA_CLUSTER_NAME}
+      - CASSANDRA_DC=${CASSANDRA_DC}
+      - CASSANDRA_RACK=${CASSANDRA_RACK}
+      - CASSANDRA_SEEDS=cassandra1,cassandra2,cassandra3
+    volumes:
+      - cassandra2_data:/var/lib/cassandra
+    networks:
+      - data
+
+  cassandra3:
+    image: cassandra:4.1.9
+    environment:
+      - CASSANDRA_CLUSTER_NAME=${CASSANDRA_CLUSTER_NAME}
+      - CASSANDRA_DC=${CASSANDRA_DC}
+      - CASSANDRA_RACK=${CASSANDRA_RACK}
+      - CASSANDRA_SEEDS=cassandra1,cassandra2,cassandra3
+    volumes:
+      - cassandra3_data:/var/lib/cassandra
+    networks:
+      - data
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml","--storage.tsdb.path=/prometheus"]
+    ports:
+      - "9090:9090"
+    networks:
+      - back
+      - data
+
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    networks:
+      - back
+
+  grafana:
+    image: grafana/grafana:9.5.2
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_admin_password
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    secrets:
+      - grafana_admin_password
+    depends_on:
+      - prometheus
+      - alertmanager
+    networks:
+      - front
+      - back
+      - data
+
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    pid: host
+    network_mode: "host"
+    command:
+      - "--collector.textfile.directory=/var/lib/node-exporter/textfile_collector"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8082:8080"
+    networks:
+      - back
+
+  blackbox:
+    image: prom/blackbox-exporter:v0.24.0
+    ports:
+      - "9115:9115"
+    networks:
+      - back
+
+  # cassandra-exporter:
+  #   image: instaclustr/cassandra-exporter:2.4.0
+  #   environment:
+  #     - CASSANDRA_HOSTS=cassandra1,cassandra2,cassandra3
+  #   networks:
+  #     - back
+  #     - data
+  # NOTE: The original image `instaclustr/cassandra-exporter` failed to pull (may be removed or private).
+  # If you need a cassandra exporter, consider using an alternative such as:
+  #   quay.io/prometheuscommunity/cassandra-exporter:latest
+  # or the exporter from instaclustr if you have credentials. Uncomment and adjust above when available.
+
+  opensearch-exporter:
+    image: quay.io/prometheuscommunity/elasticsearch-exporter:v1.7.0
+    command:
+      - '--es.uri=http://opensearch1:9200'
+      - '--es.all'
+      - '--es.indices'
+      - '--es.cluster_settings'
+      - '--web.listen-address=:9114'
+    ports:
+      - "9114:9114"
+    networks:
+      - back
+      - data
+
+  loki:
+    image: grafana/loki:2.8.1
+    # DEV ONLY: run as root so Loki can create WAL and compactor directories on Windows-mounted volumes
+    user: "0:0"
+    environment:
+      - CONSUL_HTTP_ADDR=http://consul:8500
+      - LOKI_CONFIG_FILE=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    depends_on:
+      - consul
+    networks:
+      - back
+
+
+  promtail:
+    image: grafana/promtail:2.8.1
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    networks:
+      - back
+      - data
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --compat
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD_FILE=/run/secrets/minio_root_password
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+    secrets:
+      - minio_root_password
+    networks:
+      - data
+
+  restic-backup:
+    image: restic/restic:0.17.0
+    entrypoint: ["/bin/sh","-c"]
+    command: ["while true; do sleep 3600; done"]
+    networks:
+      - data
+
+  consul:
+    image: consul:1.14
+    command: agent -dev -client=0.0.0.0
+    ports:
+      - "8500:8500"
+    networks:
+      - consul_net
+      - back
+
+volumes:
+  db_data:
+  opensearch1_data:
+  opensearch2_data:
+  opensearch3_data:
+  cassandra1_data:
+  cassandra2_data:
+  cassandra3_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  
+  minio_data:
+  glpi_data:
+
+networks:
+  front:
+  back:
+  data:
+
+  # lightweight KV used by Loki's ring in dev
+  consul_net:
+
+secrets:
+  mariadb_root_password:
+    file: ./secrets/mariadb_root_password.txt
+  glpi_db_password:
+    file: ./secrets/glpi_db_password.txt
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt
+  minio_root_password:
+    file: ./secrets/minio_root_password.txt
+  restic_password:
+    file: ./secrets/restic_password.txt

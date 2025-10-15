@@ -1,0 +1,24 @@
+cluster:
+  name: opensearch-cluster
+
+network:
+  host: 0.0.0.0
+
+discovery:
+  seed_hosts:
+    - opensearch1
+    - opensearch2
+    - opensearch3
+  initial_state_timeout: 30s
+
+node:
+  master: true
+  data: true
+  ingest: true
+
+bootstrap:
+  memory_lock: true
+
+# security disabled in this example for brevity — in prod enable security plugin and use TLS between nodes
+plugins:
+  - opensearch-security

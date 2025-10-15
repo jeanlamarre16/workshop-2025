@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: ${CLUSTER_NAME}
+
+scrape_configs:
+  - job_name: 'docker'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['node-exporter:9100','cadvisor:8080','prometheus:9090']
+        labels:
+          group: infra
+
+  - job_name: 'blackbox'
+    static_configs:
+      - targets: ['https://glpi.' + "${DOMAIN}", 'https://opensearch.' + "${DOMAIN}"]
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+
+  - job_name: 'opensearch'
+    static_configs:
+      - targets: ['opensearch1:9200','opensearch2:9200','opensearch3:9200']
+
+  - job_name: 'cassandra'
+    static_configs:
+      - targets: ['cassandra1:9404','cassandra2:9404','cassandra3:9404']
+
+  - job_name: 'glpi'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['glpi:80']
+
+rule_files:
+  - "rules/alert_rules.yml"

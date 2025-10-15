@@ -1,0 +1,31 @@
+groups:
+  - name: infra-alerts
+    rules:
+      - alert: HighDiskUsage
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 15
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk usage >85% on {{ $labels.instance }}"
+      - alert: OpenSearchClusterYellow
+        expr: opensearch_cluster_status == 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OpenSearch cluster yellow"
+      - alert: CassandraDownNodes
+        expr: cassandra_up_nodes < 3
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cassandra nodes below expected count"
+      - alert: TLSCertExpiry
+        expr: probe_ssl_earliest_cert_expiration < 1209600 # 14 days
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Certificate expires in less than 14 days for {{ $labels.instance }}"

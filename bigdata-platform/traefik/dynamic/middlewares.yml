@@ -1,0 +1,22 @@
+http:
+  middlewares:
+    securityHeaders:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        sslRedirect: true
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        contentSecurityPolicy: "default-src 'self';"
+        referrerPolicy: "no-referrer"
+    ratelimit:
+      rateLimit:
+        average: 100
+        burst: 50
+    ipwhitelist:
+      ipWhiteList:
+        sourceRange:
+          - "10.0.0.0/8"  # adjust for your infra

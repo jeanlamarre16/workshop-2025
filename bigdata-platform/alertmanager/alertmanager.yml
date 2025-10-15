@@ -1,0 +1,20 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.example.com:587' # replace or use webhook
+
+route:
+  receiver: 'team-email'
+  group_wait: 10s
+  group_interval: 10m
+  repeat_interval: 6h
+
+receivers:
+  - name: 'team-email'
+    email_configs:
+      - to: '${ALERT_EMAILS}'
+        from: 'alertmanager@${DOMAIN}'
+        send_resolved: true
+
+  - name: 'pagerduty'
+    pagerduty_configs:
+      - service_key: 'REPLACE_WITH_KEY'

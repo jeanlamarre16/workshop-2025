@@ -1,0 +1,6 @@
+http:
+  middlewares:
+    crowdsec:
+      plugin:
+        crowdsec:
+          endpoint: "http://crowdsec:8080"

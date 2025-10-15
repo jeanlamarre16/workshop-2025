@@ -1,0 +1,30 @@
+api:
+  dashboard: true
+  insecure: false
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    exposedByDefault: false
+    endpoint: "unix:///var/run/docker.sock"
+
+certificatesResolvers:
+  le:
+    acme:
+      email: "${TRAEFIK_ACME_EMAIL}"
+      storage: "/acme/acme.json"
+      tlsChallenge: {}
+
+log:
+  level: INFO
+  format: json
+
+serversTransport:
+  insecureSkipVerify: false
+
+pilot: {} # optional
