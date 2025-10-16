@@ -1,1 +1,1123 @@
 # workshop-2025
+
+## Prompt 1
+Agis comme un architecte DevOps senior chargé de concevoir, documenter et livrer
+une infrastructure big data entièrement dockerisée, prête à déployer en
+environnement de développement (Docker Compose) et de production (Docker Swarm),
+avec monitoring, pare-feu, haute disponibilité, sauvegardes et PRA complet.
+
+Ta réponse doit être auto-suffisante (tout dans un seul message), reproductible
+et immédiatement exploitable.
+
+OBJECTIF GÉNÉRAL
+
+Construire une plateforme big data incluant :
+- Un outil de ticketing (GLPI)
+- Un outil d'historisation de données (OpenSearch)
+- Un système de monitoring complet (Prometheus/Grafana)
+- Un datalake (Cassandra)
+- Un pare-feu applicatif (Traefik + CrowdSec)
+- Des mesures de haute disponibilité
+- Un plan de sauvegarde et de reprise d'activité (PRA) complet
+- Une documentation exhaustive de l'architecture et des configurations
+
+IMAGES DOCKER FIXÉES (VERSIONS PINNÉES - PAS DE :latest)
+
+REVERSE PROXY & SÉCURITÉ :
+- traefik:2.10.4
+- crowdsecurity/crowdsec:v1.6.2
+- fbonalair/traefik-crowdsec-bouncer:0.4.0
+
+TICKETING :
+- glpi/glpi:11.0.1
+- mariadb:10.11.3
+
+HISTORISATION & SEARCH :
+- opensearchproject/opensearch:2.15.0
+- opensearchproject/opensearch-dashboards:2.15.0
+
+DATALAKE :
+- cassandra:4.1.9
+
+MONITORING :
+- prom/prometheus:v2.48.0
+- prom/alertmanager:v0.25.0
+- grafana/grafana:9.5.2
+- prom/node-exporter:v1.6.1
+- gcr.io/cadvisor/cadvisor:v0.47.2
+- prom/blackbox-exporter:v0.24.0
+- quay.io/prometheuscommunity/elasticsearch-exporter:v1.7.0
+- criteord/cassandra_exporter:2.3.8 (ou alternative disponible)
+
+LOGGING :
+- grafana/loki:2.8.1
+- grafana/promtail:2.8.1
+
+STOCKAGE & BACKUPS :
+- minio/minio:RELEASE.2023-11-20T22-40-07Z
+- restic/restic:0.17.0
+
+INFRASTRUCTURE :
+- consul:1.14 (pour Loki ring en dev)
+
+CONFIGURATIONS DE VOLUMES (PRÉCISES)
+
+VOLUMES NOMMÉS DOCKER (docker-compose et stack) :
+
+Base de données & Applications :
+  db_data:
+    - Point de montage : /var/lib/mysql (MariaDB)
+    - Usage : Base de données GLPI
+    - Backup : Obligatoire via mysqldump + restic
+    - Driver : local
+
+  glpi_data:
+    - Point de montage : /var/www/html (GLPI)
+    - Usage : Fichiers et plugins GLPI
+    - Backup : Obligatoire
+    - Driver : local
+
+OpenSearch Cluster (3 nœuds) :
+  opensearch1_data:
+    - Point de montage : /usr/share/opensearch/data
+    - Usage : Données et index OpenSearch nœud 1
+    - Backup : Snapshot API vers MinIO
+    - Driver : local
+
+  opensearch2_data:
+    - Point de montage : /usr/share/opensearch/data
+    - Usage : Données et index OpenSearch nœud 2
+    - Backup : Snapshot API vers MinIO
+    - Driver : local
+
+  opensearch3_data:
+    - Point de montage : /usr/share/opensearch/data
+    - Usage : Données et index OpenSearch nœud 3
+    - Backup : Snapshot API vers MinIO
+    - Driver : local
+
+Cassandra Cluster (3 nœuds) :
+  cassandra1_data:
+    - Point de montage : /var/lib/cassandra
+    - Usage : Données Cassandra nœud 1 (SSTables, commitlog)
+    - Backup : Snapshot + nodetool vers MinIO
+    - Driver : local
+
+  cassandra2_data:
+    - Point de montage : /var/lib/cassandra
+    - Usage : Données Cassandra nœud 2
+    - Backup : Snapshot + nodetool vers MinIO
+    - Driver : local
+
+  cassandra3_data:
+    - Point de montage : /var/lib/cassandra
+    - Usage : Données Cassandra nœud 3
+    - Backup : Snapshot + nodetool vers MinIO
+    - Driver : local
+
+Monitoring & Métriques :
+  prometheus_data:
+    - Point de montage : /prometheus
+    - Usage : Données TSDB Prometheus
+    - Rétention : 30 jours
+    - Backup : Optionnel (données volatiles)
+    - Driver : local
+
+  grafana_data:
+    - Point de montage : /var/lib/grafana
+    - Usage : Dashboards, datasources, plugins Grafana
+    - Backup : Obligatoire (dashboards custom)
+    - Driver : local
+
+Logging :
+  loki_data:
+    - Point de montage : /loki
+    - Usage : Chunks, WAL, index Loki
+    - Rétention : 30 jours (720h)
+    - Backup : Optionnel
+    - Driver : local
+
+Stockage Objet :
+  minio_data:
+    - Point de montage : /data
+    - Usage : Buckets MinIO (backups restic)
+    - Backup : Réplication externe obligatoire
+    - Driver : local
+
+BIND MOUNTS (fichiers de configuration - READ-ONLY quand possible) :
+
+Traefik :
+  - ./traefik/acme:/acme (RW - certificats ACME)
+  - ./traefik/dynamic:/dynamic:ro (configurations dynamiques)
+  - /var/run/docker.sock:/var/run/docker.sock:ro (discovery)
+
+CrowdSec :
+  - ./crowdsec/data:/var/lib/crowdsec/data (base de données locale)
+  - ./crowdsec/config:/etc/crowdsec (configurations)
+  - /var/log:/var/log:ro (logs système)
+
+Prometheus :
+  - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  - ./prometheus/rules:/etc/prometheus/rules:ro (alert rules)
+
+Alertmanager :
+  - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+Grafana :
+  - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    Contient :
+      - datasources/prometheus.yml
+      - datasources/loki.yml
+      - dashboards/dashboards.yml
+      - dashboards/*.json
+
+Loki :
+  - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+
+Promtail :
+  - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+  - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  - /var/log:/var/log:ro
+
+Node Exporter :
+  - /proc:/host/proc:ro
+  - /sys:/host/sys:ro
+  - /:/rootfs:ro
+
+cAdvisor :
+  - /:/rootfs:ro
+  - /var/run:/var/run:rw
+  - /sys:/sys:ro
+  - /var/lib/docker/:/var/lib/docker:ro
+
+Cassandra (si configs custom) :
+  - ./cassandra/cassandra1.yaml:/etc/cassandra/cassandra.yaml:ro
+  - ./cassandra/cassandra2.yaml:/etc/cassandra/cassandra.yaml:ro
+  - ./cassandra/cassandra3.yaml:/etc/cassandra/cassandra.yaml:ro
+
+OpenSearch (si configs custom) :
+  - ./opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
+
+ARCHITECTURE RÉSEAU DOCKER
+
+RÉSEAUX OVERLAY (Docker Swarm) / BRIDGE (Docker Compose) :
+
+front:
+  - Driver : overlay (prod) / bridge (dev)
+  - Usage : Services exposés publiquement via Traefik
+  - Services : traefik, glpi, grafana, opensearch-dashboards, crowdsec, traefik-bouncer
+  - Encryption : Oui (--opt encrypted)
+
+back:
+  - Driver : overlay (prod) / bridge (dev)
+  - Usage : Services internes de monitoring
+  - Services : prometheus, alertmanager, grafana, loki, promtail, blackbox, cadvisor
+  - Encryption : Oui
+
+data:
+  - Driver : overlay (prod) / bridge (dev)
+  - Usage : Backends de données
+  - Services : mariadb, opensearch1, opensearch2, opensearch3, cassandra1, cassandra2, cassandra3, minio, opensearch-exporter
+  - Encryption : Oui
+
+consul_net:
+  - Driver : overlay (prod) / bridge (dev)
+  - Usage : Service discovery Loki (dev seulement)
+  - Services : consul, loki
+
+ISOLATION :
+- Traefik ne peut communiquer qu'avec front
+- Prometheus scrape via back et data
+- Databases isolées sur data
+- Pas de communication directe front <-> data (via back uniquement)
+
+SECRETS DOCKER (OBLIGATOIRES)
+
+Secrets à créer dans ./secrets/ (dev) ou via docker secret create (prod) :
+
+1. mariadb_root_password.txt
+   - Usage : Root password MariaDB
+   - Génération : openssl rand -base64 32
+
+2. glpi_db_password.txt
+   - Usage : GLPI database password
+   - Génération : openssl rand -base64 32
+
+3. grafana_admin_password.txt
+   - Usage : Grafana admin password
+   - Génération : openssl rand -base64 32
+
+4. minio_root_password.txt
+   - Usage : MinIO root password
+   - Génération : openssl rand -base64 32
+
+5. restic_password.txt
+   - Usage : Chiffrement backups restic
+   - Génération : openssl rand -base64 32
+
+6. opensearch_admin_password.txt (si nécessaire)
+   - Usage : OpenSearch admin password
+   - Génération : openssl rand -base64 32
+
+MONTAGE DES SECRETS :
+- Point de montage : /run/secrets/<secret_name>
+- Permissions : 0400
+- Variables d'environnement : *_FILE pour pointer vers le secret
+
+CONFIGURATIONS DÉTAILLÉES PAR SERVICE
+
+TRAEFIK :
+  Ports : 80, 443, 8080 (dashboard dev only)
+  Command :
+    - --providers.docker=true
+    - --providers.docker.exposedbydefault=false
+    - --providers.docker.swarmMode=true (prod only)
+    - --providers.file.directory=/dynamic
+    - --entrypoints.web.address=:80
+    - --entrypoints.websecure.address=:443
+    - --entrypoints.web.http.redirections.entryPoint.to=websecure
+    - --entrypoints.web.http.redirections.entryPoint.scheme=https
+    - --certificatesresolvers.le.acme.email=${TRAEFIK_ACME_EMAIL}
+    - --certificatesresolvers.le.acme.storage=/acme/acme.json
+    - --certificatesresolvers.le.acme.tlschallenge=true
+    - --api=true
+    - --api.dashboard=true
+    - --metrics.prometheus=true
+    - --log.level=INFO
+    - --accesslog=true
+  Middlewares (dans /dynamic/middlewares.yml) :
+    - securityHeaders : HSTS, X-Frame-Options, CSP
+    - ratelimit : 100 req/s burst 50
+    - crowdsec-forwardauth : intégration bouncer
+  Deploy :
+    replicas : 2 (prod)
+    placement : spread managers
+    resources :
+      limits : cpu 0.5, memory 512M
+      reservations : cpu 0.25, memory 256M
+
+CROWDSEC :
+  Volumes :
+    - ./crowdsec/data:/var/lib/crowdsec/data
+    - ./crowdsec/config:/etc/crowdsec
+    - /var/log:/var/log:ro
+  Environment :
+    - COLLECTIONS=crowdsecurity/traefik crowdsecurity/http-cve
+    - PARSERS=crowdsecurity/traefik-logs
+  Cap_drop : ALL
+  Cap_add : [] (aucune)
+  Healthcheck : cscli lapi status
+
+TRAEFIK-BOUNCER :
+  Environment :
+    - CROWDSEC_BOUNCER_API_KEY (généré via cscli bouncers add)
+    - CROWDSEC_AGENT_HOST=crowdsec:8080
+    - GIN_MODE=release (prod)
+  Depends_on : crowdsec
+  Healthcheck : curl -f http://localhost:8080/api/v1/healthz
+
+MARIADB :
+  Image : mariadb:10.11.3
+  Command : --transaction-isolation=READ-COMMITTED --binlog-format=ROW --innodb-buffer-pool-size=256M
+  Environment :
+    - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mariadb_root_password
+    - MYSQL_DATABASE=${GLPI_DB_NAME}
+    - MYSQL_USER=${GLPI_DB_USER}
+    - MYSQL_PASSWORD_FILE=/run/secrets/glpi_db_password
+  Volumes :
+    - db_data:/var/lib/mysql
+    - ./mariadb/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  Healthcheck :
+    test : mysqladmin ping -u root --password=$(cat /run/secrets/mariadb_root_password)
+    interval : 30s
+    timeout : 10s
+    retries : 5
+  Deploy :
+    replicas : 1
+    placement : constraints [node.role == manager]
+    resources :
+      limits : cpu 1.0, memory 1G
+
+GLPI :
+  Image : glpi/glpi:11.0.1
+  Environment :
+    - GLPI_DB_HOST=mariadb
+    - GLPI_DB_USER=${GLPI_DB_USER}
+    - GLPI_DB_PASSWORD_FILE=/run/secrets/glpi_db_password
+    - GLPI_DB_NAME=${GLPI_DB_NAME}
+  Volumes :
+    - glpi_data:/var/www/html
+  Labels Traefik :
+    - traefik.enable=true
+    - traefik.http.routers.glpi.rule=Host(`glpi.${DOMAIN}`)
+    - traefik.http.routers.glpi.entrypoints=websecure
+    - traefik.http.routers.glpi.tls.certresolver=le
+    - traefik.http.routers.glpi.middlewares=securityHeaders@file,ratelimit@file,crowdsec-forwardauth@docker
+    - traefik.http.services.glpi.loadbalancer.server.port=80
+  Depends_on : mariadb
+  Healthcheck :
+    test : curl -f http://localhost || exit 1
+    interval : 30s
+  Deploy :
+    replicas : 2 (prod)
+    update_config : parallelism 1, delay 30s
+    resources :
+      limits : cpu 0.5, memory 1G
+
+OPENSEARCH (cluster 3 nœuds) :
+  Image : opensearchproject/opensearch:2.15.0
+  Environment (commun) :
+    - cluster.name=opensearch-cluster
+    - discovery.seed_hosts=opensearch1,opensearch2,opensearch3
+    - cluster.initial_master_nodes=opensearch1,opensearch2,opensearch3
+    - bootstrap.memory_lock=true
+    - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_ADMIN_PASSWORD}
+    - plugins.security.disabled=false
+    - plugins.security.ssl.http.enabled=true
+    - plugins.security.ssl.transport.enforce_hostname_verification=false
+  Environment (par nœud) :
+    - node.name=opensearch1 (2, 3)
+  Ulimits :
+    memlock : soft -1, hard -1
+    nofile : soft 65536, hard 65536
+  Volumes : opensearch{1,2,3}_data:/usr/share/opensearch/data
+  Healthcheck :
+    test : curl -fsSk https://localhost:9200/_cluster/health
+    interval : 30s
+  Deploy (par nœud) :
+    replicas : 1
+    placement : node.hostname == node{1,2,3} (anti-affinity)
+    resources :
+      limits : cpu 2.0, memory 2G
+      reservations : cpu 1.0, memory 1G
+
+OPENSEARCH-DASHBOARDS :
+  Image : opensearchproject/opensearch-dashboards:2.15.0
+  Environment :
+    - OPENSEARCH_HOSTS=["https://opensearch1:9200","https://opensearch2:9200","https://opensearch3:9200"]
+  Ports : 5601
+  Labels Traefik :
+    - traefik.enable=true
+    - traefik.http.routers.opensearch-dashboards.rule=Host(`opensearch.${DOMAIN}`)
+    - traefik.http.routers.opensearch-dashboards.entrypoints=websecure
+    - traefik.http.routers.opensearch-dashboards.tls.certresolver=le
+    - traefik.http.services.opensearch-dashboards.loadbalancer.server.port=5601
+
+CASSANDRA (cluster 3 nœuds) :
+  Image : cassandra:4.1.9
+  Environment (commun) :
+    - CASSANDRA_CLUSTER_NAME=${CASSANDRA_CLUSTER_NAME}
+    - CASSANDRA_DC=${CASSANDRA_DC}
+    - CASSANDRA_RACK=${CASSANDRA_RACK}
+    - CASSANDRA_SEEDS=cassandra1,cassandra2,cassandra3
+    - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+    - MAX_HEAP_SIZE=512M
+    - HEAP_NEWSIZE=100M
+  Volumes : cassandra{1,2,3}_data:/var/lib/cassandra
+  Healthcheck :
+    test : nodetool status | grep UN
+    interval : 30s
+    timeout : 10s
+    retries : 5
+  Deploy (par nœud) :
+    replicas : 1
+    placement : node.hostname == node{1,2,3}
+    resources :
+      limits : cpu 2.0, memory 2G
+      reservations : cpu 1.0, memory 1G
+
+CASSANDRA EXPORTER :
+  Image : criteord/cassandra_exporter:2.3.8
+  Environment :
+    - CASSANDRA_HOST=cassandra1 (un par nœud ou discovery)
+  Ports : 9404 (metrics)
+
+PROMETHEUS :
+  Image : prom/prometheus:v2.48.0
+  Volumes :
+    - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - ./prometheus/rules:/etc/prometheus/rules:ro
+    - prometheus_data:/prometheus
+  Command :
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=30d
+    - --web.enable-lifecycle
+  Ports : 9090
+  Deploy :
+    replicas : 1
+    resources :
+      limits : cpu 1.0, memory 2G
+
+ALERTMANAGER :
+  Image : prom/alertmanager:v0.25.0
+  Volumes :
+    - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+  Ports : 9093
+
+GRAFANA :
+  Image : grafana/grafana:9.5.2
+  Environment :
+    - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_admin_password
+    - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
+    - GF_INSTALL_PLUGINS=grafana-piechart-panel
+  Volumes :
+    - grafana_data:/var/lib/grafana
+    - ./grafana/provisioning:/etc/grafana/provisioning:ro
+  Secrets :
+    - grafana_admin_password
+  Ports : 3000
+  Labels Traefik :
+    - traefik.enable=true
+    - traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)
+    - traefik.http.routers.grafana.entrypoints=websecure
+    - traefik.http.routers.grafana.tls.certresolver=le
+
+NODE-EXPORTER :
+  Image : prom/node-exporter:v1.6.1
+  Command :
+    - --path.procfs=/host/proc
+    - --path.sysfs=/host/sys
+    - --path.rootfs=/rootfs
+    - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+  Volumes :
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
+    - /:/rootfs:ro
+  Network_mode : host (ou pid:host + networks)
+  Deploy :
+    mode : global (un par nœud)
+
+CADVISOR :
+  Image : gcr.io/cadvisor/cadvisor:v0.47.2
+  Volumes :
+    - /:/rootfs:ro
+    - /var/run:/var/run:rw
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+  Ports : 8080
+  Deploy :
+    mode : global
+
+BLACKBOX-EXPORTER :
+  Image : prom/blackbox-exporter:v0.24.0
+  Volumes :
+    - ./blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+  Ports : 9115
+
+LOKI :
+  Image : grafana/loki:2.8.1
+  Volumes :
+    - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+    - loki_data:/loki
+  Ports : 3100
+  Environment :
+    - LOKI_CONFIG_FILE=/etc/loki/local-config.yaml
+  Command : -config.file=/etc/loki/local-config.yaml
+
+PROMTAIL :
+  Image : grafana/promtail:2.8.1
+  Volumes :
+    - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    - /var/log:/var/log:ro
+  Command : -config.file=/etc/promtail/config.yml
+  Deploy :
+    mode : global
+
+MINIO :
+  Image : minio/minio:RELEASE.2023-11-20T22-40-07Z
+  Command : server /data --console-address ":9001" --compat
+  Environment :
+    - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+    - MINIO_ROOT_PASSWORD_FILE=/run/secrets/minio_root_password
+  Volumes :
+    - minio_data:/data
+  Ports : 9000 (API), 9001 (Console)
+  Healthcheck :
+    test : curl -f http://localhost:9000/minio/health/live
+    interval : 30s
+
+RESTIC-BACKUP :
+  Image : restic/restic:0.17.0
+  Volumes :
+    - db_data:/backup/db_data:ro
+    - glpi_data:/backup/glpi_data:ro
+    - grafana_data:/backup/grafana_data:ro
+    - ./scripts:/scripts:ro
+  Environment :
+    - RESTIC_REPOSITORY=s3:http://minio:9000/${MINIO_BUCKET}
+    - RESTIC_PASSWORD_FILE=/run/secrets/restic_password
+    - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+    - AWS_SECRET_ACCESS_KEY_FILE=/run/secrets/minio_root_password
+  Secrets :
+    - restic_password
+    - minio_root_password
+  Entrypoint : /scripts/backup-cron.sh
+  Deploy :
+    replicas : 1
+    placement : node.role == manager
+
+CONSUL (dev only) :
+  Image : consul:1.14
+  Command : agent -dev -client=0.0.0.0
+  Ports : 8500
+
+FICHIERS DE CONFIGURATION À FOURNIR
+
+1. prometheus.yml (scrape configs actuels + jobs manquants)
+2. alertmanager.yml (routes, receivers email/pagerduty)
+3. prometheus/rules/alert_rules.yml (seuils CPU, mémoire, disk, services down)
+4. loki-config.yml (actuel + compactor, retention)
+5. promtail-config.yml (actuel + labels service/stack/node)
+6. traefik/dynamic/middlewares.yml (securityHeaders, ratelimit)
+7. grafana/provisioning/datasources/*.yml (Prometheus, Loki)
+8. grafana/provisioning/dashboards/*.json (4 dashboards minimum)
+9. blackbox/blackbox.yml (modules http_2xx, tcp_connect)
+10. cassandra/init.cql (keyspace exemple RF=3)
+11. mariadb/init.sql (tables GLPI custom si nécessaire)
+12. scripts/backup.sh (restic backup avec rétention GFS)
+13. scripts/restore.sh (restic restore)
+14. scripts/backup-cron.sh (planification 2h du matin)
+15. nftables.conf (firewall hôte)
+16. .env.example (toutes les variables)
+17. Makefile (targets : up, down, deploy, backup, restore, logs, test)
+18. README.md (procédures complètes)
+19. PRA.md (plan de reprise détaillé)
+20. docs/architecture.md (diagrammes Mermaid)
+21. checks.sh (validation post-déploiement)
+
+CONTRAINTES DE SÉCURITÉ
+
+1. Réseaux segmentés (front/back/data) avec encryption overlay
+2. Tous les secrets via Docker secrets
+3. TLS obligatoire (HTTPS uniquement, certificats ACME)
+4. Headers de sécurité Traefik (HSTS, CSP, X-Frame-Options)
+5. Rate limiting Traefik (100 req/s)
+6. Ressources CPU/mémoire limitées (deploy.resources)
+7. Volumes en lecture seule quand possible (:ro)
+8. Cap_drop : ALL pour CrowdSec
+9. No new privileges
+10. Healthchecks sur tous les services critiques
+11. Pare-feu hôte nftables (ports 22, 80, 443, 2377, 7946, 4789 uniquement)
+12. RBAC OpenSearch, Grafana
+13. Passwords complexes (openssl rand -base64 32)
+14. Rotation secrets documentée dans PRA
+
+HAUTE DISPONIBILITÉ (PRODUCTION SWARM)
+
+1. Docker Swarm : 3 managers (quorum), 2+ workers
+2. Contraintes d'anti-affinité (spread par hostname/zone)
+3. Réplicas : Traefik(2), GLPI(2), Grafana(2)
+4. Rolling updates : parallelism=1, delay=30s, failure_action=rollback
+5. Healthchecks avec retry et timeout adaptés
+6. Stateful services : placement sur managers avec volumes persistants
+7. Réseaux overlay avec encryption
+8. Update_config et rollback_config pour tous les services
+
+MONITORING : DASHBOARDS OBLIGATOIRES
+
+1. Infra Overview :
+   - Statut des services (up/down)
+   - CPU/RAM/Disk par nœud
+   - Trafic réseau
+   - Erreurs 4xx/5xx Traefik
+   - Expiration certificats (<14j)
+
+2. Apps & Proxy :
+   - Latences P50/P95/P99
+   - Requests per second (RPS)
+   - Backend saturation
+   - Erreurs backend
+   - CrowdSec bans
+
+3. Cassandra :
+   - État du cluster (UN/DN)
+   - Pending compactions
+   - Latences read/write P99
+   - Dropped mutations
+   - Heap usage
+
+4. OpenSearch :
+   - Cluster status (green/yellow/red)
+   - Heap usage / GC
+   - Shards (active/relocating/unassigned)
+   - Indexing/search rate
+   - Query latency
+
+ALERTING : RÈGLES OBLIGATOIRES
+
+1. Instance down (>1min)
+2. CPU >85% (>5min)
+3. Memory >85% (>5min)
+4. Disk >85%
+5. Certificat SSL <14 jours
+6. OpenSearch cluster not green (>5min)
+7. Cassandra node down
+8. Quorum Swarm perdu
+9. Backup failed
+10. Database replication lag >60s
+
+Receivers : email (Alertmanager), webhook (optionnel), PagerDuty (prod)
+
+PLAN DE SAUVEGARDE (BACKUPS)
+
+Stratégie GFS (Grandfather-Father-Son) :
+- Quotidiennes : 7 jours
+- Hebdomadaires : 4 semaines
+- Mensuelles : 12 mois
+- Annuelles : 3 ans
+
+Services à sauvegarder :
+1. MariaDB : mysqldump + binlogs
+2. GLPI : files /var/www/html
+3. Grafana : dashboards /var/lib/grafana
+4. OpenSearch : Snapshot API vers MinIO
+5. Cassandra : nodetool snapshot + commitlogs
+6. Prometheus : optionnel (données volatiles)
+
+Chiffrement : restic avec clé 256-bit
+Destination : MinIO S3-compatible
+Planification : cron 02h00 tous les jours
+Rétention : restic forget --keep-* selon GFS
+Tests de restauration : mensuels obligatoires
+
+Scripts :
+- backup.sh : déclenche toutes les sauvegardes
+- restore.sh : restauration complète ou partielle
+- backup-cron.sh : planification via crond
+
+PRA : PLAN DE REPRISE D'ACTIVITÉ
+
+Objectifs :
+- RTO (Recovery Time Objective) : 2 heures
+- RPO (Recovery Point Objective) : 1 heure (backups quotidiens)
+
+Scénarios couverts :
+1. Panne d'un nœud Swarm
+2. Perte d'un volume Docker
+3. Corruption base de données
+4. Incident sécurité (compromission)
+5. Perte de quorum Swarm
+6. Expiration certificats
+7. Coupure réseau/datacenter
+
+Runbooks détaillés à fournir :
+1. Restauration MariaDB depuis backup
+2. Restauration OpenSearch depuis snapshot
+3. Restauration Cassandra depuis snapshot
+4. Reconstruction cluster Swarm
+5. Re-génération certificats ACME
+6. Rotation des secrets Docker
+7. Rollback d'une mise à jour ratée
+
+Checklist jour J :
+- [ ] Déclaration incident
+- [ ] Communication équipe
+- [ ] Évaluation impact
+- [ ] Décision restauration
+- [ ] Exécution runbook
+- [ ] Validation fonctionnelle
+- [ ] Post-mortem
+
+Tests DR :
+- Trimestriels obligatoires
+- Mesure RTO/RPO réels
+- Documentation améliorations
+
+VARIABLES D'ENVIRONNEMENT (.env.example)
+
+# General
+DOMAIN=example.com
+EMAIL_ADMIN=admin@example.com
+CLUSTER_NAME=bigdata
+ENV=production
+
+# Traefik / TLS
+TRAEFIK_ACME_EMAIL=${EMAIL_ADMIN}
+TRAEFIK_ENTRYPOINT_HTTP=web
+TRAEFIK_ENTRYPOINT_HTTPS=websecure
+CROWDSEC_BOUNCER_API_KEY=GENERATE_VIA_CSCLI
+
+# GLPI / MariaDB
+GLPI_DB_USER=glpi
+GLPI_DB_NAME=glpi
+
+# MinIO / Backup
+MINIO_ROOT_USER=minioadmin
+MINIO_BUCKET=backups
+RESTIC_RETENTION_DAILY=7
+RESTIC_RETENTION_WEEKLY=4
+RESTIC_RETENTION_MONTHLY=12
+RESTIC_RETENTION_YEARLY=3
+
+# Prometheus/Alerting
+ALERT_EMAILS=oncall@example.com,ops@example.com
+
+# OpenSearch
+OPENSEARCH_ADMIN_PASSWORD=ChangeMe_SecurePassword123!
+
+# Cassandra
+CASSANDRA_CLUSTER_NAME=bigdata_cassandra
+CASSANDRA_DC=dc1
+CASSANDRA_RACK=rack1
+
+# Swarm (prod only)
+SWARM_MANAGERS=3
+SWARM_WORKERS=2
+
+# Resource limits
+MAX_CPU_LIMIT=2
+MAX_MEM_LIMIT=2G
+
+ARBORESCENCE DU DÉPÔT (COMPLÈTE)
+
+bigdata-platform/
+├── docker-compose.dev.yml
+├── stack.prod.yml
+├── .env
+├── .env.example
+├── .gitignore
+├── Makefile
+├── README.md
+├── PRA.md
+├── secrets/
+│   ├── mariadb_root_password.txt
+│   ├── glpi_db_password.txt
+│   ├── grafana_admin_password.txt
+│   ├── minio_root_password.txt
+│   ├── restic_password.txt
+│   └── opensearch_admin_password.txt
+├── traefik/
+│   ├── acme/
+│   │   └── acme.json (600)
+│   └── dynamic/
+│       └── middlewares.yml
+├── crowdsec/
+│   ├── config/
+│   │   └── (configs auto-générées)
+│   └── data/
+│       └── (db locale)
+├── prometheus/
+│   ├── prometheus.yml
+│   └── rules/
+│       └── alert_rules.yml
+├── alertmanager/
+│   └── alertmanager.yml
+├── grafana/
+│   └── provisioning/
+│       ├── datasources/
+│       │   ├── prometheus.yml
+│       │   └── loki.yml
+│       └── dashboards/
+│           ├── dashboards.yml
+│           ├── infra-overview.json
+│           ├── apps-proxy.json
+│           ├── cassandra.json
+│           └── opensearch.json
+├── loki/
+│   └── loki-config.yml
+├── promtail/
+│   └── promtail-config.yml
+├── blackbox/
+│   └── blackbox.yml
+├── mariadb/
+│   └── init.sql
+├── cassandra/
+│   └── init.cql
+├── opensearch/
+│   ├── opensearch.yml (optionnel)
+│   └── index-templates/
+│       └── logs-template.json
+├── scripts/
+│   ├── backup.sh
+│   ├── restore.sh
+│   ├── backup-cron.sh
+│   ├── init-swarm.sh
+│   └── checks.sh
+├── nftables/
+│   └── nftables.conf
+└── docs/
+    ├── architecture.md
+    ├── deployment.md
+    └── runbooks/
+        ├── restore-mariadb.md
+        ├── restore-opensearch.md
+        ├── restore-cassandra.md
+        └── swarm-recovery.md
+
+MAKEFILE : TARGETS OBLIGATOIRES
+
+Targets à implémenter :
+- make up : docker compose -f docker-compose.dev.yml up -d
+- make down : docker compose -f docker-compose.dev.yml down
+- make deploy : docker stack deploy -c stack.prod.yml bigdata
+- make logs SERVICE=<name> : docker compose logs -f <name>
+- make backup : lance ./scripts/backup.sh
+- make restore : lance ./scripts/restore.sh
+- make test : lance ./scripts/checks.sh
+- make init-secrets : génère tous les secrets
+- make init-swarm : initialise cluster Swarm
+- make grafana-import : import dashboards
+- make help : affiche l'aide
+
+TESTS ET VALIDATION (checks.sh)
+
+Vérifications automatiques :
+1. Tous les conteneurs sont UP
+2. Healthchecks passent (healthy)
+3. Prometheus scrape tous les targets (up)
+4. Alertmanager connecté à Prometheus
+5. Grafana datasources connectés
+6. Loki reçoit des logs
+7. OpenSearch cluster green
+8. Cassandra cluster UN (Up Normal) tous les nœuds
+9. Traefik certificats valides (>14j)
+10. Backups existent et <24h
+11. CrowdSec LAPI répond
+12. MariaDB replication OK (si répliqué)
+
+Endpoints à tester :
+- https://glpi.${DOMAIN}
+- https://grafana.${DOMAIN}
+- https://opensearch.${DOMAIN}
+- http://localhost:9090/-/healthy (Prometheus)
+- http://localhost:3100/ready (Loki)
+- http://localhost:8080/dashboard/ (Traefik)
+
+Statuts attendus : 200 OK, clusters GREEN/UN, healthy
+
+HYPOTHÈSES ET VALEURS PAR DÉFAUT
+
+1. Domaine : example.com (à remplacer dans .env)
+2. Email admin : admin@example.com
+3. Timezone : Europe/Paris
+4. Retention Prometheus : 30 jours
+5. Retention Loki : 30 jours (720h)
+6. OpenSearch heap : 512m (ajuster selon RAM disponible)
+7. Cassandra heap : 512m/100m (adjust selon RAM)
+8. Backups : 02h00 tous les jours
+9. Swarm : 3 managers, 2 workers minimum
+10. TLS : Let's Encrypt prod (staging pour tests)
+11. Rate limit Traefik : 100 req/s
+12. Cassandra RF : 3, Consistency QUORUM
+13. OpenSearch replicas : 1 (3 nœuds)
+
+CRITÈRES D'ACCEPTATION FINAUX
+
+[ OK ] Déploiement dev opérationnel : docker compose -f docker-compose.dev.yml up -d
+[ OK ] Déploiement prod opérationnel : docker stack deploy -c stack.prod.yml bigdata
+[ OK ] HTTPS via Traefik fonctionnel (certificats ACME valides)
+[ OK ] CrowdSec + Bouncer actifs (vérifiable dans logs)
+[ OK ] GLPI accessible et fonctionnel
+[ OK ] OpenSearch cluster GREEN (3 nœuds)
+[ OK ] Cassandra cluster UN (3 nœuds)
+[ OK ] Prometheus scrape tous les exporters
+[ OK ] Alertmanager reçoit et route les alertes
+[ OK ] Grafana affiche les 4 dashboards
+[ OK ] Loki reçoit les logs des conteneurs
+[ OK ] Backup manuel réussi (make backup)
+[ OK ] Restore testé et validé (make restore)
+[ OK ] Checks.sh passe tous les tests
+[ OK ] PRA complet, clair, avec runbooks détaillés
+[ OK ] Documentation complète (README, architecture, runbooks)
+[ OK ] Secrets générés et montés correctement
+[ OK ] Pare-feu nftables configuré
+[ OK ] Tous les fichiers fournis en blocs de code complets
+
+NOTES FINALES
+
+- Utiliser UNIQUEMENT des images officielles ou de confiance
+- PINER toutes les versions (pas de :latest)
+- Tous les fichiers doivent être fournis en blocs de code complets et prêts à l'emploi
+- Commentaires clairs dans tous les fichiers de config
+- Exemples réalistes (labels, variables, dashboards)
+- Aucune étape manquante
+- Code reproductible à l'identique
+- Architecture production-ready avec HA et DR complets
+
+## Prompt 10
+Rédige un cahier des charges complet, crédible et professionnel décrivant la transformation digitale complète d’un outil emblématique de Poudlard 
+(par exemple : le Choixpeau Magique, la Bibliothèque, le Système de sécurité du château, le Planning des cours ou le Registre des baguettes magiques). 
+Le document devra inclure : une introduction claire présentant le contexte, les enjeux et les objectifs de modernisation de Poudlard ; 
+une analyse détaillée de l’outil existant avec ses fonctionnalités actuelles, ses utilisateurs (élèves, professeurs, créatures magiques, direction) et ses limites ; 
+une enquête fictive mais réaliste auprès du Conseil des Sorciers, contenant des témoignages, besoins, attentes et suggestions pour améliorer le fonctionnement ; 
+la définition des objectifs stratégiques et techniques de la transformation digitale (modernisation, sécurité, interopérabilité magique, expérience utilisateur) ; 
+la description des nouvelles fonctionnalités innovantes intégrant des technologies numériques et magiques (intelligence artificielle enchantée, réalité augmentée magique, plateforme collaborative, automatisation des sorts, etc.) ; 
+les spécifications techniques (infrastructure, sécurité des données magiques, compatibilité avec les artefacts existants, accessibilité interespèces) ; un planning clair des étapes du projet (analyse, conception, développement, tests, déploiement, formation) ; un budget estimatif détaillé et une offre commerciale persuasive, valorisant les bénéfices et le retour sur investissement pour Poudlard. 
+Le ton doit être professionnel, structuré, institutionnel et engageant, avec une touche magique subtile et cohérente inspirée de l’univers de Harry Potter, afin de produire un document crédible, attractif et digne
+ d’une présentation au Conseil des Sorciers.
+
+ ## Prompt 16
+ Agis comme lead Flutter et designer UI/UX. Livre, en un seul message autosuffisant, une application Flutter **3.35.1** (Android + iOS) intitulée « Tri de Sorciers », dont l’écran principal affiche un QCM immersif et moderne : la question en haut, quatre réponses au centre sous forme de boutons A/B/C/D avec petites icônes mystiques, un décor discret de parchemin, d’étoiles et de lueurs, et un résultat final déterminant l’un des quatre types de sorciers prédéfinis. Le projet ne doit dépendre d’aucun service externe, ne doit pas inclure de pipeline CI et ne doit pas imposer d’objectif de couverture.
+
+Utilise **exclusivement** les technologies et dépendances suivantes, sans alternatives ni « au choix » : Flutter 3.35.1, Dart compatible avec cette version, **go_router** pour la navigation, **flutter_riverpod** pour l’état, **flutter_animate** pour les animations, les icônes Material intégrées à Flutter pour les pictogrammes (pas de `flutter_svg`), des **polices locales embarquées** en assets (pas de `google_fonts`). Épingle les versions dans `pubspec.yaml` de manière stable et compatible avec Flutter 3.35.1. Aucune autre dépendance tierce ne doit figurer dans `dependencies` ou `dev_dependencies` en dehors de `flutter_test` fourni par Flutter et de ce qui est explicitement listé ici.
+
+Structure le projet de façon classique : un dossier `lib/` contenant `main.dart`, une configuration de thème claire/sombre avec un design system (couleurs, typographies, rayons, ombres), un module `features/quiz/` comprenant les modèles, le parsing JSON, la logique de scoring, l’état Riverpod, les vues et widgets (bouton mystique réutilisable, carte question, barre de progression), un module `routing/` configurant **go_router** avec deux routes (`/quiz`, `/result`), un dossier `assets/` avec `questions.json` et les fichiers TTF des polices locales (par exemple une serif décorative et une sans-serif lisible, incluses sous licence libre en tant que fichiers dans `assets/fonts/`, référencées dans `pubspec.yaml`, sans usage de `google_fonts`). Implémente le décor magique avec des dégradés, un léger grain/texture via `CustomPainter`, des particules d’étoiles via `CustomPainter` animé et des halos doux sur les boutons avec **flutter_animate**. Garantit l’accessibilité (contrastes suffisants, tailles dynamiques, labels pour lecteurs d’écran), un comportement responsive téléphone/tablette et un mode sombre.
+
+Implémente la logique métier ainsi : chaque réponse sélectionnée ajoute un point à la maison associée (gryffindor, slytherin, ravenclaw, hufflepuff). À la fin des 20 questions, calcule la maison gagnante par score total; en cas d’égalité, départage en privilégiant la maison la plus fréquente dans les réponses récentes, sinon applique l’ordre déterministe Gryffondor > Serpentard > Serdaigle > Poufsouffle. Gère la navigation avec **go_router** (état du quiz conservé dans Riverpod), un bouton « Suivant » désactivé tant qu’aucune réponse n’est cochée, un retour à la question précédente possible, une barre de progression « 1/20 », un écran de résultat présentant le blason stylisé (composition vectorielle simple avec `CustomPainter`, sans image externe), le total par maison et un bouton « Recommencer ».
+
+Charge les données depuis `assets/questions.json` et valide le schéma avant d’afficher le quiz. Le JSON embarqué suit exactement ce format : un objet racine `{ "version": 1, "houses": ["gryffindor","slytherin","ravenclaw","hufflepuff"], "questions": [...] }` où `questions` est un tableau de 20 éléments `{ id, text, icon, answers }`, et `answers` un tableau de quatre objets `{ "key": "A"|"B"|"C"|"D", "label": "<texte>", "house": "<id maison>" }`. Fournis le fichier `assets/questions.json` complet et cohérent avec ce schéma, contenant 20 questions inspirées de l’univers magique mais rédigées originalement. Déclare `assets/` et `assets/fonts/` dans `pubspec.yaml`.
+
+Rédige un `pubspec.yaml` précis, avec dépendances épinglées : `go_router` (navigation), `flutter_riverpod` (état), `flutter_animate` (animations), aucune autre. Ajoute dans `flutter:` les assets et polices locales (`family` titre décorative et `family` texte UI). Fournis l’ensemble du code Dart avec en-têtes de chemin de fichier, y compris : `main.dart` initialisant le thème et le routeur; `routing/app_router.dart` configurant **go_router**; `theme/app_theme.dart` et `theme/tokens.dart` définissant couleurs (rouge #7F0909, or #D3A625, bleu nuit #0E1A40, vert #2A623D, fond parchemin #F8F4E9, texte #111827 et variantes sombres), tailles et styles typographiques; `features/quiz/models.dart` pour les entités; `features/quiz/data_source.dart` pour le chargement/validation du JSON; `features/quiz/score_service.dart` pour l’algorithme de score et le tie-break; `features/quiz/state.dart` pour les providers Riverpod; `features/quiz/widgets/` pour la carte question, le bouton mystique et la barre de progression; `features/quiz/pages/quiz_page.dart` et `features/quiz/pages/result_page.dart` pour les écrans; `features/quiz/decors/` pour les peintures personnalisées (parchemin, étoiles). Ajoute des tests unitaires et widget basiques dans `test/` couvrant le parsing JSON, le calcul des scores et l’activation du bouton « Suivant » après sélection d’une réponse; ne configure ni badge ni pipeline CI et ne produis aucun rapport de couverture. Rédige un `README.md` expliquant l’installation avec Flutter 3.35.1, `flutter pub get`, `flutter run`, la structure du code, la personnalisation des couleurs, des polices locales et du JSON, ainsi que les bonnes pratiques d’accessibilité et de performance.
+
+Respecte strictement ces choix technologiques. Pour **ce cas**, la navigation est assurée par **go_router**, l’état par **flutter_riverpod** et les animations par **flutter_animate**. Pour **un autre cas** nécessitant une navigation déclarative minimale dans une micro-app sans multipage, indique clairement dans un encadré de documentation que la navigation intégrée `Navigator` peut suffire, mais ne la mets pas en œuvre ici. Ne propose pas d’autres bibliothèques ni variantes dans le code livré. Termine en produisant tous les fichiers mentionnés (code, `pubspec.yaml`, `assets/questions.json`, polices locales déclarées, tests et `README.md`) prêts à être copiés-collés et exécutés.
+
+
+## Prompt 22
+RÔLE
+
+Tu es GPT-5, une intelligence artificielle experte en data science, NLP (traitement du langage naturel), data visualisation, automatisation Python et rédaction technique.
+Tu travailles en mode autonome complet dans ChatGPT (Advanced Data Analysis activé).
+Tu dois réaliser une étude complète et documentée sur la saga Harry Potter, du traitement des données à la génération d’un rapport PDF final, sans intervention humaine.
+
+OBJECTIF GLOBAL
+
+Analyser les sept tomes de Harry Potter donnés en pièce jointe sous forme de PDF afin de déterminer, à l’aide de statistiques, d’analyse sémantique et de visualisation de données, si les livres deviennent plus qualitatifs au fil du temps.
+
+Le projet doit inclure :
+
+L’extraction et la préparation des textes.
+
+L’analyse lexicale et contextuelle.
+
+La normalisation statistique.
+
+La création de visualisations.
+
+La génération d’un rapport complet documenté.
+
+ÉTAPES À RÉALISER
+1. COLLECTE ET PRÉPARATION DES DONNÉES
+
+Récupère automatiquement les textes intégraux ou résumés complets (en anglais ou français) des 7 livres de Harry Potter à partir de sources libres de droit ou publiques.
+
+Structure les données par livre, chapitre, nombre de mots et nombre de pages estimé.
+
+Nettoie les textes : suppression de la ponctuation, des caractères spéciaux, normalisation des noms propres.
+
+2. EXTRACTION DES INDICATEURS NARRATIFS
+
+Pour chaque livre, calcule :
+
+Nombre de fois où Harry touche sa cicatrice.
+
+Nombre de répliques où Hermione dit “Mais” ou “But”.
+
+Nombre de décisions arbitraires de Dumbledore (modifiant le cours de l’histoire).
+
+Nombre de prises de parole de Harry, Hermione et Ron.
+
+Nombre de passages où Rogue est décrit comme sombre, mystérieux ou inquiétant.
+
+Nombre d’actes moralement ou pénalement répréhensibles par la loi de Poudlard ou française (violence, mensonge, magie illégale, vol, etc.).
+
+
+3. NORMALISATION DES STATISTIQUES
+
+Calcule toutes les occurrences par 10 000 mots, par 100 pages et par chapitre.
+
+Compare les densités de chaque indicateur entre les livres.
+
+Crée un tableau récapitulatif global (DataFrame).
+
+4. VISUALISATION
+
+Génère et enregistre des graphiques clairs et esthétiques :
+
+Diagrammes à barres comparant les indicateurs entre les livres.
+
+Courbes d’évolution (tendances narratives à travers les tomes).
+
+Heatmap des occurrences par chapitre.
+
+Diagrammes circulaires des actes répréhensibles.
+
+Scatter plots corrélant la longueur du livre et la fréquence des événements.
+
+5. DOCUMENTATION ET LIVRABLES
+
+Produis automatiquement :
+
+Un rapport PDF complet contenant :
+
+Introduction et objectif.
+
+Méthodologie d’analyse.
+
+Graphiques et interprétations.
+
+Conclusion analytique et humoristique.
+
+Le code Python complet et commenté.
+
+Un fichier CSV/JSON contenant les statistiques brutes.
+
+Une arborescence de projet claire :
+
+harry_potter_analysis/
+├── data/
+│   ├── raw_texts/
+│   ├── processed/
+├── scripts/
+│   ├── extract_texts.py
+│   ├── analyze_texts.py
+│   ├── visualize_results.py
+├── results/
+│   ├── graphs/
+│   ├── stats.csv
+│   └── report.pdf
+
+6. BONUS OPTIONNEL
+
+Crée un mini dashboard interactif (Plotly ou Streamlit).
+
+Génère une synthèse narrative humoristique :
+
+Exemple : “Harry parle moins, Hermione parle plus, et les crimes augmentent — la cicatrice pique moins, mais la morale aussi.”
+
+CONTRAINTES TECHNIQUES
+
+Aucune question ne doit être posée à l’utilisateur.
+
+Toutes les étapes doivent être exécutées automatiquement.
+
+Langue de travail : français.
+
+Librairies autorisées : pandas, nltk ou spacy, matplotlib, plotly, re, os, json, reportlab.
+
+Code Python propre, modulaire et commenté.
+
+Visualisations enregistrées dans /results/graphs/.
+
+SORTIES ATTENDUES
+
+Scripts Python complets.
+
+Graphiques exportés en .png ou .svg.
+
+Rapport final PDF.
+
+Fichier CSV/JSON avec toutes les statistiques.
+
+Résumé narratif analytique et humoristique.
+
+COMPORTEMENT ATTENDU
+
+Exécuter chaque étape séquentiellement sans requérir d’instruction humaine.
+
+Expliquer brièvement les grandes étapes avant de les exécuter.
+
+Documenter les choix méthodologiques.
+
+Produire un travail complet, propre et interprété.
+
+EXEMPLE DE CONCLUSION FINALE
+
+“La saga Harry Potter s’assombrit à mesure qu’elle progresse. Les actes moralement discutables augmentent, Hermione reste la plus bavarde, et Dumbledore continue à bouleverser les règles à sa guise. En somme, la cicatrice fait moins mal, mais la morale aussi.”
+
+INSTRUCTION FINALE
+
+Exécute l’intégralité du projet décrit ci-dessus, du chargement des textes à la génération du rapport final PDF, sans demander d’intervention humaine.
+Tout doit être automatisé, expliqué et reproductible.
