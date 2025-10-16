@@ -1,0 +1,22 @@
+/* src/index.css */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #1c1b29;
+  color: #f8f4e3;
+  font-family: 'Cinzel', serif;
+}
+
+button {
+  background-color: #4c2a85;
+  color: #f8f4e3;
+  border: 1px solid #a78bfa;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #a78bfa;
+  color: #1c1b29;
+}
