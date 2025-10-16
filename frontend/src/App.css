@@ -1,0 +1,325 @@
+/* === Hedwige Mail Magical Theme === */
+body {
+  background: radial-gradient(circle at top, #1c1b29, #0b0a10);
+  color: #f0e6d2;
+  font-family: 'Georgia', 'Garamond', serif;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: rgba(35, 30, 50, 0.8);
+  border: 2px solid #b89f53;
+  border-radius: 12px;
+  box-shadow: 0 0 25px rgba(255, 215, 0, 0.2);
+}
+
+h1 {
+  text-align: center;
+  font-size: 2.5rem;
+  color: #d4af37;
+  text-shadow: 0 0 10px #c29b3d;
+  margin-bottom: 1.5rem;
+}
+
+.profile {
+  text-align: right;
+  font-style: italic;
+  color: #e6cf87;
+  margin-bottom: 1rem;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 1.5rem;
+}
+
+.sidebar {
+  background: rgba(45, 35, 60, 0.9);
+  border: 1px solid #b89f53;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-y: auto;
+  height: 500px;
+}
+
+.sidebar h3 {
+  color: #e6cf87;
+  border-bottom: 1px solid #b89f53;
+  padding-bottom: 0.5rem;
+}
+
+.msg-item {
+  padding: 0.5rem;
+  border-bottom: 1px solid #4d3f26;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+}
+
+.msg-item:hover {
+  background: rgba(184, 159, 83, 0.15);
+}
+
+.msg-item strong {
+  color: #d4af37;
+}
+
+.snippet {
+  font-size: 0.85rem;
+  color: #b0a27e;
+}
+
+.content {
+  background: rgba(25, 20, 35, 0.9);
+  border: 1px solid #b89f53;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.compose {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.compose input,
+.compose textarea {
+  background: #2e253a;
+  border: 1px solid #b89f53;
+  color: #f0e6d2;
+  border-radius: 6px;
+  padding: 0.5rem;
+  font-family: inherit;
+}
+
+.compose button {
+  background: linear-gradient(90deg, #8b6b2d, #b89f53);
+  color: #1c1b29;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.compose button:hover {
+  background: linear-gradient(90deg, #b89f53, #e6cf87);
+  transform: scale(1.05);
+}
+
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.tabs button {
+  background: #2e253a;
+  border: 1px solid #b89f53;
+  color: #e6cf87;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tabs button.active {
+  background: linear-gradient(90deg, #b89f53, #e6cf87);
+  color: #1c1b29;
+  font-weight: bold;
+}
+
+.tabs button:hover {
+  transform: scale(1.05);
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.profile .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #b89f53;
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #4c2a85, #a78bfa);
+  color: #fdf6e3;
+  padding: 12px 20px;
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  animation: fadeInOut 3.5s ease forwards;
+  z-index: 9999;
+  font-family: 'Cinzel', serif;
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  10%, 90% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+}
+
+/* ✨ Animation plume magique */
+button[disabled] {
+  background: #4c2a85;
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+.feather-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #fefae0;
+  animation: floatFeather 1.8s ease-in-out infinite;
+}
+
+@keyframes floatFeather {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}
+
+.writing {
+  font-style: italic;
+  font-family: 'Cinzel', serif;
+  color: #f9f6f2;
+  animation: shimmer 2s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* ✉️ Erreur de champ e-mail */
+.error {
+  color: #ffb703;
+  background: rgba(50, 0, 0, 0.3);
+  padding: 6px 10px;
+  border-radius: 8px;
+  margin-top: 4px;
+  font-style: italic;
+  animation: fadeIn 0.4s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.login-box {
+  text-align: center;
+  background: rgba(20, 20, 40, 0.7);
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
+  margin-top: 50px;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px 12px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.profile .avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #e2b714; /* doré, esprit Poudlard */
+}
+
+.profile button {
+  margin-left: auto;
+  background: #e2b714;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.profile button:hover {
+  background: #c59f12;
+}
+
+/* Conteneur de la page de connexion */
+.login-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: radial-gradient(circle at top, #2e1a47, #000);
+  color: #f8f3e8;
+  font-family: 'Cinzel', serif;
+  text-align: center;
+}
+
+/* Titre principal */
+.login-container h1 {
+  font-size: 2.2rem;
+  margin-bottom: 1rem;
+}
+
+/* Texte de description */
+.login-container p {
+  margin-bottom: 1.5rem;
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+/* Conteneur du bouton Google */
+.login-container > div {
+  display: flex;
+  justify-content: center;
+}
+
+/* Bouton Google : ajustement de taille */
+.google-login-button {
+  width: auto !important;
+  min-width: 240px;
+  max-width: 300px;
+  margin: 0 auto;
+}
